@@ -1,6 +1,10 @@
 #include <iostream>
+#include "game/Power4Board.hpp"
 
 int main() {
-    std::cout << "Hello, World!" << std::endl;
+    Power4Board board;
+
+    while (! board.isFull())
+
     return 0;
 }
