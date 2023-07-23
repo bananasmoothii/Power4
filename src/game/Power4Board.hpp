@@ -218,10 +218,20 @@ public:
                 if (!winnerCoords.empty() && winnerCoords[0] == Coord(x, y)) {
                     std::cout << dye::yellow(board[y][x]);
                     winnerCoords.erase(winnerCoords.begin());
-                } else if (board[y][x] == 0) {
-                    std::cout << dye::grey(board[y][x]);
                 } else {
-                    std::cout << board[y][x];
+                    switch (board[y][x]) {
+                        case 0:
+                            std::cout << dye::grey(board[y][x]);
+                            break;
+                        case 1:
+                            std::cout << dye::green(board[y][x]);
+                            break;
+                        case 2:
+                            std::cout << dye::blue(board[y][x]);
+                            break;
+                        default:
+                            std::cout << board[y][x];
+                    }
                 }
                 std::cout << " ";
             }
