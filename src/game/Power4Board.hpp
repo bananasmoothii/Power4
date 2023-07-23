@@ -8,6 +8,8 @@
 
 #include <vector>
 #include <memory>
+#include <queue>
+#include <stack>
 #include "Game.hpp"
 #include "../util/Coord.hpp"
 #include "color.hpp"
@@ -17,7 +19,7 @@ private:
     int width;
     int height;
     std::unique_ptr<std::unique_ptr<unsigned short[]>[]> board;
-    mutable std::vector<Coord> computedWinnerCoords;
+    mutable std::stack<Coord> computedWinnerCoords;
     mutable bool isWinnerCoordsComputed = false;
 
     void checkBounds(int x, int y) const {
@@ -26,7 +28,7 @@ private:
         }
     }
 
-    void setWinnerCoords(const std::vector<Coord> &coords) const {
+    void setWinnerCoords(const std::stack<Coord> &coords) const {
         isWinnerCoordsComputed = true;
         computedWinnerCoords = coords;
     }
@@ -125,31 +127,32 @@ public:
     }
 
     [[nodiscard]] std::unique_ptr<unsigned short> getWinner() const override {
-        std::vector<Coord> coords = getWinnerCoords();
+        std::stack<Coord> coords = getWinnerCoords();
         if (coords.empty()) return {nullptr};
-        Coord coord0 = coords[0];
+        Coord coord0 = coords.top();
         return std::make_unique<unsigned short>(board[coord0.getY()][coord0.getX()]);
     }
 
     /**
      * This uses a cache.
-     * @return a vector of all coords that are part of the winning line, sorted by ascending y then ascending x.
+     * @return a vector of all coords that are part of the winning line, sorted by descending x then descending y,
+     * meaning that std::queue::top() will return the coords with the lowest x then lowest y.
      * Empty if no winner.
      */
-    [[nodiscard]] std::vector<Coord> getWinnerCoords() const {
+    [[nodiscard]] std::stack<Coord> getWinnerCoords() const {
         if (isWinnerCoordsComputed) {
             return computedWinnerCoords;
         }
-        std::vector<Coord> coords;
+        std::stack<Coord> coords;
         // Horizontal
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width - 3; x++) {
                 unsigned short value = board[y][x];
                 if (value != 0 && value == board[y][x + 1] && value == board[y][x + 2] && value == board[y][x + 3]) {
-                    coords.emplace_back(x, y);
-                    coords.emplace_back(x + 1, y);
-                    coords.emplace_back(x + 2, y);
-                    coords.emplace_back(x + 3, y);
+                    coords.emplace(x + 3, y);
+                    coords.emplace(x + 2, y);
+                    coords.emplace(x + 1, y);
+                    coords.emplace(x, y);
                     setWinnerCoords(coords);
                     return coords;
                 }
@@ -160,10 +163,10 @@ public:
             for (int y = 0; y < height - 3; y++) {
                 unsigned short value = board[y][x];
                 if (value != 0 && value == board[y + 1][x] && value == board[y + 2][x] && value == board[y + 3][x]) {
-                    coords.emplace_back(x, y);
-                    coords.emplace_back(x, y + 1);
-                    coords.emplace_back(x, y + 2);
-                    coords.emplace_back(x, y + 3);
+                    coords.emplace(x, y + 3);
+                    coords.emplace(x, y + 2);
+                    coords.emplace(x, y + 1);
+                    coords.emplace(x, y);
                     setWinnerCoords(coords);
                     return coords;
                 }
@@ -175,10 +178,10 @@ public:
                 unsigned short value = board[y][x];
                 if (value != 0 && value == board[y + 1][x + 1] && value == board[y + 2][x + 2] &&
                     value == board[y + 3][x + 3]) {
-                    coords.emplace_back(x, y);
-                    coords.emplace_back(x + 1, y + 1);
-                    coords.emplace_back(x + 2, y + 2);
-                    coords.emplace_back(x + 3, y + 3);
+                    coords.emplace(x + 3, y + 3);
+                    coords.emplace(x + 2, y + 2);
+                    coords.emplace(x + 1, y + 1);
+                    coords.emplace(x, y);
                     setWinnerCoords(coords);
                     return coords;
                 }
@@ -189,11 +192,10 @@ public:
                 unsigned short value = board[y][x];
                 if (value != 0 && value == board[y - 1][x + 1] && value == board[y - 2][x + 2] &&
                     value == board[y - 3][x + 3]) {
-                    // we need to reverse the order of the coords so that they are sorted by ascending y then ascending x
-                    coords.emplace_back(x + 3, y - 3);
-                    coords.emplace_back(x + 2, y - 2);
-                    coords.emplace_back(x + 1, y - 1);
-                    coords.emplace_back(x, y);
+                    coords.emplace(x, y);
+                    coords.emplace(x + 1, y - 1);
+                    coords.emplace(x + 2, y - 2);
+                    coords.emplace(x + 3, y - 3);
                     setWinnerCoords(coords);
                     return coords;
                 }
@@ -212,12 +214,12 @@ public:
             std::cout << letter << " ";
         }
         std::cout << std::endl;
-        std::vector<Coord> winnerCoords = getWinnerCoords();
+        std::stack<Coord> winnerCoords = getWinnerCoords();
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                if (!winnerCoords.empty() && winnerCoords[0] == Coord(x, y)) {
+                if (!winnerCoords.empty() && winnerCoords.top() == Coord(x, y)) {
                     std::cout << dye::yellow(board[y][x]);
-                    winnerCoords.erase(winnerCoords.begin());
+                    winnerCoords.pop();
                 } else {
                     switch (board[y][x]) {
                         case 0:
