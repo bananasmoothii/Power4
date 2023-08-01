@@ -10,15 +10,15 @@
 #include <memory>
 #include <queue>
 #include <stack>
+#include <array>
 #include "Game.hpp"
 #include "../util/Coord.hpp"
 #include "color.hpp"
 
+template<std::size_t width, std::size_t height>
 class Power4Board : public Game<unsigned short> {
 private:
-    int width;
-    int height;
-    std::unique_ptr<std::unique_ptr<unsigned short[]>[]> board;
+    std::array<std::array<unsigned int, width>, height> board;
     mutable std::stack<Coord> computedWinnerCoords;
     mutable bool isWinnerCoordsComputed = false;
 
@@ -34,20 +34,11 @@ private:
     }
 
 public:
-    Power4Board(int width, int height) : width(width), height(height),
-                                         board(std::make_unique<std::unique_ptr<unsigned short[]>[]>(height)) {
+    Power4Board() : board{std::array<std::array<unsigned int, width>, height>()} {
         if (width < 4 || height < 4) {
             throw std::invalid_argument("width or height too small");
         }
-        for (int y = 0; y < height; y++) {
-            board[y] = std::make_unique<unsigned short[]>(width);
-            for (int x = 0; x < width; x++) {
-                board[y][x] = 0;
-            }
-        }
     }
-
-    Power4Board() : Power4Board(7, 6) {}
 
     [[nodiscard]] int getWidth() const {
         return width;
@@ -93,11 +84,12 @@ public:
     /**
      * Count elements with a given predicate, returning true or false for each element
      */
-    int count(bool (*predicate)(unsigned short)) const {
+    template<typename P>
+    int count(P &&predicate) const {
         int count = 0;
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; ++y) {
-                if (predicate(board[x][y])) {
+                if (predicate(board[y][x])) {
                     count++;
                 }
             }
@@ -109,7 +101,7 @@ public:
         int count = 0;
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; ++y) {
-                if (board[x][y] == value) {
+                if (board[y][x] == value) {
                     count++;
                 }
             }

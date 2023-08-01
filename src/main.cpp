@@ -2,7 +2,8 @@
 #include "game/Power4Board.hpp"
 
 int main() {
-    Power4Board board;
+    const int width = 7, height = 6;
+    Power4Board<width, height> board;
     std::unique_ptr<unsigned short> winner = nullptr;
     unsigned short players = 2;
     unsigned short currentPlayer = 1;
@@ -33,6 +34,7 @@ int main() {
     } else {
         std::cout << "Winner: player " << *winner << std::endl;
     }
+    std::cout << board.count([](unsigned short value) { return value == 0; }) << " empty cells left" << std::endl;
 
     return 0;
 }
