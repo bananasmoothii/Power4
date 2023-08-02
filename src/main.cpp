@@ -2,11 +2,10 @@
 #include "game/Power4Board.hpp"
 
 int main() {
-    const int width = 7, height = 6;
-    Power4Board<width, height> board;
-    std::unique_ptr<unsigned short> winner = nullptr;
-    unsigned short players = 2;
-    unsigned short currentPlayer = 1;
+    Power4Board board;
+    std::unique_ptr<unsigned char> winner = nullptr;
+    unsigned long players = board.getPlayers().size();
+    Power4Player currentPlayer = board.getPlayers().at(0);
 
     board.print();
 
@@ -24,7 +23,7 @@ int main() {
             continue;
         }
         winner = board.getWinner();
-        currentPlayer = (currentPlayer % players) + 1;
+        currentPlayer = (currentPlayer % players) + '1';
         board.print();
     } while (!board.isDraw() && winner == nullptr);
 
