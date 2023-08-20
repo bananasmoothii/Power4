@@ -1,8 +1,8 @@
 #include <iostream>
-#include "game/Power4Board.hpp"
+#include "game/Power4Game.hpp"
 
 int main() {
-    Power4Board board;
+    Power4Game board;
     std::unique_ptr<unsigned char> winner = nullptr;
     unsigned long players = board.getPlayers().size();
     Power4Player currentPlayer = board.getPlayers().at(0);

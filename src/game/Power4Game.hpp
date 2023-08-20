@@ -2,8 +2,8 @@
 // Created by bananasmoothii on 21/07/2023.
 //
 
-#ifndef POWER4_POWER4BOARD_HPP
-#define POWER4_POWER4BOARD_HPP
+#ifndef POWER4_POWER4GAME_HPP
+#define POWER4_POWER4GAME_HPP
 
 
 #include <vector>
@@ -18,7 +18,7 @@
 
 typedef unsigned char Power4Player;
 
-class Power4Board : public Game<Power4Player> {
+class Power4Game : public Game<Power4Player> {
 private:
     int width, height;
     std::vector<Power4Player> board;
@@ -40,13 +40,13 @@ private:
 
 public:
 
-    Power4Board(int width, int height) : width(width), height(height), board(width * height, '0') {
+    Power4Game(int width, int height) : width(width), height(height), board(width * height, '0') {
         if (width < 4 || height < 4) {
             throw std::invalid_argument("width or height too small");
         }
     }
 
-    Power4Board() : Power4Board(7, 6) {}
+    Power4Game() : Power4Game(7, 6) {}
 
     [[nodiscard]] int getWidth() const {
         return width;
@@ -246,4 +246,4 @@ public:
 };
 
 
-#endif //POWER4_POWER4BOARD_HPP
+#endif //POWER4_POWER4GAME_HPP
