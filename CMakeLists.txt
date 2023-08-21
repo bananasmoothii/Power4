@@ -8,6 +8,7 @@ add_executable(Power4
         src/game/Power4Game.hpp
         src/game/Game.hpp
         src/util/Coord.hpp
+        src/util/MathUtils.hpp
 )
 
 target_include_directories(Power4 PRIVATE thirdparty/include)

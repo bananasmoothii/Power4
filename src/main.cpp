@@ -33,7 +33,7 @@ int main() {
     } else {
         std::cout << "Winner: player " << *winner << std::endl;
     }
-    std::cout << board.count([](unsigned short value) { return value == 0; }) << " empty cells left" << std::endl;
+    std::cout << board.count([](unsigned short value) { return value == '0'; }) << " empty cells left" << std::endl;
 
     return 0;
 }

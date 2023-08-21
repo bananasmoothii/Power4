@@ -12,7 +12,9 @@
 template<typename Player>
 class Game {
     /**
-     * Returns the score of the player, higher is better
+     * Returns the score of the player, higher is better.
+     *
+     * If there are only two players, the score of the first player is the opposite of the score of the second player.
      */
     virtual double getScore(const Player &player) const = 0;
 

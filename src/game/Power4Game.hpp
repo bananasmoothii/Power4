@@ -11,8 +11,11 @@
 #include <queue>
 #include <stack>
 #include <array>
+#include <limits>
+#include <format>
 #include "Game.hpp"
 #include "../util/Coord.hpp"
+#include "../util/MathUtils.hpp"
 #include "color.hpp"
 
 
@@ -20,16 +23,18 @@ typedef unsigned char Power4Player;
 
 class Power4Game : public Game<Power4Player> {
 private:
-    int width, height;
+    unsigned int width, height;
     std::vector<Power4Player> board;
     mutable std::stack<int> computedWinnerCoords;
     mutable bool isWinnerCoordsComputed = false;
 
-    int getIndex(int x, int y) const {
-        if (x < 0 || x >= width)
-            throw std::out_of_range("x out of range, should be between 0 and " + std::to_string(width));
-        if (y < 0 || y >= height)
-            throw std::out_of_range("y out of range, should be between 0 and " + std::to_string(height));
+    unsigned int getIndex(unsigned int x, unsigned int y) const {
+        if (x >= width)
+            throw std::out_of_range(
+                    "x out of range, should be between 0 and " + std::to_string(width) + ", was " + std::to_string(x));
+        if (y >= height)
+            throw std::out_of_range(
+                    "y out of range, should be between 0 and " + std::to_string(height) + ", was " + std::to_string(y));
         return y * width + x;
     }
 
@@ -48,15 +53,15 @@ public:
 
     Power4Game() : Power4Game(7, 6) {}
 
-    [[nodiscard]] int getWidth() const {
+    [[nodiscard]] unsigned int getWidth() const {
         return width;
     }
 
-    [[nodiscard]] int getHeight() const {
+    [[nodiscard]] unsigned int getHeight() const {
         return height;
     }
 
-    [[nodiscard]] unsigned short get(int x, int y) const {
+    [[nodiscard]] unsigned short get(unsigned int x, unsigned int y) const {
         return board[getIndex(x, y)];
     }
 
@@ -70,8 +75,9 @@ public:
         if (column < 0 || column >= width) {
             throw std::out_of_range("column out of range");
         }
-        for (int y = height - 1; y >= 0; y--) {
-            int index = getIndex(column, y);
+        for (unsigned int y = height - 1;
+             y <= height; y--) { // loop will end when y underflows to the max value of unsigned int
+            unsigned int index = getIndex(column, y);
             if (board[index] == '0') {
                 board[index] = player;
                 isWinnerCoordsComputed = false;
@@ -81,8 +87,188 @@ public:
         return false;
     }
 
+    enum IteratorType {
+        HORIZONTAL,
+        VERTICAL,
+        DIAGONAL_DOWN,
+        DIAGONAL_UP
+    };
+
+    static constexpr std::array<IteratorType, 4> iteratorTypes = {HORIZONTAL, VERTICAL, DIAGONAL_DOWN, DIAGONAL_UP};
+
+    class BoardIterator {
+    private:
+        const Power4Game *game;
+        const IteratorType iteratorType;
+        int x, y; // current coordinates
+
+    public:
+        BoardIterator(const Power4Game *game, const IteratorType iteratorType, int x, int y) : game(game), iteratorType(
+                iteratorType), x(x), y(y) {}
+
+        explicit BoardIterator(const Power4Game *game, const IteratorType iteratorType) : game(game),
+                                                                                          iteratorType(iteratorType),
+                                                                                          x(0), y(0) {}
+
+        [[nodiscard]] IteratorType getIteratorType() const {
+            return iteratorType;
+        }
+
+        [[nodiscard]] bool isInBoard() const {
+            return x >= 0 && x < game->getWidth() && y >= 0 && y < game->getHeight();
+        }
+
+        Power4Player operator*() const {
+            // Deference operator
+            return game->get(x, y);
+        }
+
+        [[nodiscard]] Power4Player getOrEmpty() const {
+            if (isInBoard()) {
+                return game->get(x, y);
+            }
+            return 0;
+        }
+
+        [[nodiscard]] Power4Player previousOrEmpty() const {
+            unsigned int previousX = x;
+            unsigned int previousY = y;
+            switch (iteratorType) {
+                case HORIZONTAL:
+                    previousX--;
+                    break;
+                case VERTICAL:
+                    previousY--;
+                    break;
+                case DIAGONAL_DOWN:
+                    previousX--;
+                    previousY--;
+                    break;
+                case DIAGONAL_UP:
+                    previousX--;
+                    previousY++;
+                    break;
+            }
+            if (previousX >= game->getWidth() || previousY >= game->getHeight()) {
+                return 0;
+            }
+            return game->get(previousX, previousY);
+        }
+
+        BoardIterator &operator++() {
+            // Prefix increment operator
+            switch (iteratorType) {
+                case HORIZONTAL:
+                    x++;
+                    break;
+                case VERTICAL:
+                    y++;
+                    break;
+                case DIAGONAL_DOWN:
+                    x++;
+                    y++;
+                    break;
+                case DIAGONAL_UP:
+                    x++;
+                    y--;
+                    break;
+            }
+            return *this;
+        }
+
+        bool operator!=(const BoardIterator &other) const {
+            return x != other.x || y != other.y || iteratorType != other.iteratorType;
+        }
+
+        bool operator==(const BoardIterator &other) const {
+            return !(*this != other);
+        }
+    };
+
+private:
+    static constexpr double WIN_SCORE = std::numeric_limits<double>::infinity();
+    static constexpr double SCORE_3_ALIGNED = 10;
+    static constexpr double SCORE_2_ALIGNED = 5;
+
+    [[nodiscard]] static double calculateScore(unsigned int nb2Aligned, unsigned int nb3Aligned) {
+        return SCORE_2_ALIGNED * nb2Aligned + (nb3Aligned == 0 ? 0 : intPow(SCORE_3_ALIGNED, nb3Aligned));
+    }
+
+public:
+    /**
+     * Returns the score of the player, higher is better
+     *
+     * Scores:
+     * - 2 aligned: 5n (n = number of 2 aligned)
+     * - 3 aligned: 10^n (n = number of 3 aligned)
+     * - 4 aligned: infinite
+     * Subtract the same score for the opponent
+     */
     [[nodiscard]] double getScore(const Power4Player &player) const override {
-        return 0; // TODO
+        unsigned int p1Aligns2 = 0;
+        unsigned int p1Aligns3 = 0;
+        unsigned int p2Aligns2 = 0;
+        unsigned int p2Aligns3 = 0;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                for (const IteratorType &iteratorType: iteratorTypes) {
+                    const Power4Player playerAtIteratorStart = get(x, y);
+                    if (playerAtIteratorStart == '0') continue;
+
+                    unsigned int *currentAligns2Ptr;
+                    unsigned int *currentAligns3Ptr;
+                    if (playerAtIteratorStart == '1') {
+                        currentAligns2Ptr = &p1Aligns2;
+                        currentAligns3Ptr = &p1Aligns3;
+                    } else {
+                        currentAligns2Ptr = &p2Aligns2;
+                        currentAligns3Ptr = &p2Aligns3;
+                    }
+
+                    BoardIterator boardIterator{this, iteratorType, x, y};
+                    const bool hasSpaceBefore = boardIterator.previousOrEmpty() == '0';
+                    ++boardIterator; // this iterator is actually always one ahead of the current cell
+                    unsigned int i = 1;
+                    Power4Player current = playerAtIteratorStart;
+                    Power4Player next = boardIterator.getOrEmpty();
+                    if (!next) continue;
+                    while (current == playerAtIteratorStart) {
+                        switch (i) {
+                            case 2:
+                                if (hasSpaceBefore) { // invalid if the player cannot continue
+                                    ++(*currentAligns2Ptr);
+                                }
+                                if (next == '0') { // if two sides are free, there are two possibilities to continue
+                                    ++(*currentAligns2Ptr);
+                                }
+                                break;
+                            case 3:
+                                if (hasSpaceBefore) {
+                                    ++(*currentAligns3Ptr);
+                                    --(*currentAligns2Ptr); // 3 aligned is also 2 aligned
+                                }
+                                if (next == '0') {
+                                    ++(*currentAligns3Ptr);
+                                    --(*currentAligns2Ptr); // we are removing 2 2aligned because 2 were added in the previous iteration
+                                }
+                                break;
+                            case 4:
+                                return player == playerAtIteratorStart ? WIN_SCORE : -WIN_SCORE;
+                            default:
+                                break;
+                        }
+
+                        if (!boardIterator.isInBoard()) break; // if future current is not in board
+                        ++i;
+                        ++boardIterator;
+                        current = next;
+                        next = boardIterator.getOrEmpty();
+                    }
+                }
+            }
+        }
+        double p1Score = calculateScore(p1Aligns2, p1Aligns3) - calculateScore(p2Aligns2, p2Aligns3);
+        return player == '1' ? p1Score : -p1Score;
     }
 
     [[nodiscard]] std::vector<Power4Player> getPlayers() const override {
@@ -95,11 +281,9 @@ public:
     template<typename P>
     int count(P &&predicate) const {
         int count = 0;
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; ++y) {
-                if (predicate(board[getIndex(x, y)])) {
-                    count++;
-                }
+        for (const auto &item: board) {
+            if (predicate(item)) {
+                count++;
             }
         }
         return count;
@@ -107,11 +291,9 @@ public:
 
     [[nodiscard]] int count(Power4Player value) const {
         int count = 0;
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; ++y) {
-                if (board[getIndex(x, y)] == value) {
-                    count++;
-                }
+        for (const auto &item: board) {
+            if (item == value) {
+                count++;
             }
         }
         return count;
@@ -242,6 +424,13 @@ public:
             }
             std::cout << std::endl;
         }
+        printScores();
+    }
+
+    void printScores() const {
+        double p1Score = getScore('1');
+        std::cout << "Scores: " << dye::green(std::format("1: {:.1f}", p1Score)) << " "
+                  << dye::blue(std::format("2: {:.1f}", -p1Score)) << std::endl;
     }
 };
 
