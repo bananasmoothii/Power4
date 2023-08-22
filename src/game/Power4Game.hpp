@@ -17,6 +17,7 @@
 #include "../util/Coord.hpp"
 #include "../util/MathUtils.hpp"
 #include "color.hpp"
+#include "../util/OutOfRangeException.hpp"
 
 
 typedef unsigned char Power4Player;
@@ -25,20 +26,20 @@ class Power4Game : public Game<Power4Player> {
 private:
     unsigned int width, height;
     std::vector<Power4Player> board;
-    mutable std::stack<int> computedWinnerCoords;
+    mutable std::stack<unsigned int> computedWinnerCoords;
     mutable bool isWinnerCoordsComputed = false;
 
     unsigned int getIndex(unsigned int x, unsigned int y) const {
         if (x >= width)
-            throw std::out_of_range(
+            throw OutOfRangeException(
                     "x out of range, should be between 0 and " + std::to_string(width) + ", was " + std::to_string(x));
         if (y >= height)
-            throw std::out_of_range(
+            throw OutOfRangeException(
                     "y out of range, should be between 0 and " + std::to_string(height) + ", was " + std::to_string(y));
         return y * width + x;
     }
 
-    void setWinnerCoords(const std::stack<int> &coords) const {
+    void setWinnerCoords(const std::stack<unsigned int> &coords) const {
         isWinnerCoordsComputed = true;
         computedWinnerCoords = coords;
     }
@@ -61,18 +62,24 @@ public:
         return height;
     }
 
-    [[nodiscard]] unsigned short get(unsigned int x, unsigned int y) const {
+    [[nodiscard]] Power4Player get(unsigned int x, unsigned int y) const {
         return board[getIndex(x, y)];
+    }
+
+    [[nodiscard]] Power4Player get(int x, int y) const {
+        if (x < 0) throw OutOfRangeException("x out of range, should be positive, was " + std::to_string(x));
+        if (y < 0) throw OutOfRangeException("y out of range, should be positive, was " + std::to_string(y));
+        return board[getIndex(static_cast<unsigned int>(x), static_cast<unsigned int>(y))];
     }
 
     /**
      * Adds a player to the column, returns true if successful, false if not
      */
-    bool addInColumn(int column, Power4Player player) {
+    bool addInColumn(unsigned int column, Power4Player player) {
         if (player != '1' && player != '2') {
             throw std::invalid_argument("player must be 1 or 2");
         }
-        if (column < 0 || column >= width) {
+        if (column >= width) {
             throw std::out_of_range("column out of range");
         }
         for (unsigned int y = height - 1;
@@ -103,19 +110,19 @@ public:
         int x, y; // current coordinates
 
     public:
-        BoardIterator(const Power4Game *game, const IteratorType iteratorType, int x, int y) : game(game), iteratorType(
-                iteratorType), x(x), y(y) {}
+        BoardIterator(const Power4Game *game, const IteratorType iteratorType, const int startX, const int startY)
+                : game(game), iteratorType(iteratorType), x(startX), y(startY) {}
 
-        explicit BoardIterator(const Power4Game *game, const IteratorType iteratorType) : game(game),
-                                                                                          iteratorType(iteratorType),
-                                                                                          x(0), y(0) {}
+        BoardIterator(const Power4Game *game, const IteratorType iteratorType)
+                : game(game), iteratorType(iteratorType), x(0), y(0) {}
 
         [[nodiscard]] IteratorType getIteratorType() const {
             return iteratorType;
         }
 
         [[nodiscard]] bool isInBoard() const {
-            return x >= 0 && x < game->getWidth() && y >= 0 && y < game->getHeight();
+            return x >= 0 && x < static_cast<int>(game->getWidth()) && y >= 0 &&
+                   y < static_cast<int>(game->getHeight());
         }
 
         Power4Player operator*() const {
@@ -128,31 +135,6 @@ public:
                 return game->get(x, y);
             }
             return 0;
-        }
-
-        [[nodiscard]] Power4Player previousOrEmpty() const {
-            unsigned int previousX = x;
-            unsigned int previousY = y;
-            switch (iteratorType) {
-                case HORIZONTAL:
-                    previousX--;
-                    break;
-                case VERTICAL:
-                    previousY--;
-                    break;
-                case DIAGONAL_DOWN:
-                    previousX--;
-                    previousY--;
-                    break;
-                case DIAGONAL_UP:
-                    previousX--;
-                    previousY++;
-                    break;
-            }
-            if (previousX >= game->getWidth() || previousY >= game->getHeight()) {
-                return 0;
-            }
-            return game->get(previousX, previousY);
         }
 
         BoardIterator &operator++() {
@@ -171,6 +153,27 @@ public:
                 case DIAGONAL_UP:
                     x++;
                     y--;
+                    break;
+            }
+            return *this;
+        }
+
+        BoardIterator &operator--() {
+            // Prefix decrement operator
+            switch (iteratorType) {
+                case HORIZONTAL:
+                    x--;
+                    break;
+                case VERTICAL:
+                    y--;
+                    break;
+                case DIAGONAL_DOWN:
+                    x--;
+                    y--;
+                    break;
+                case DIAGONAL_UP:
+                    x--;
+                    y++;
                     break;
             }
             return *this;
@@ -209,15 +212,37 @@ public:
         unsigned int p1Aligns3 = 0;
         unsigned int p2Aligns2 = 0;
         unsigned int p2Aligns3 = 0;
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
+        for (unsigned int y = 0; y < height; y++) {
+            for (unsigned int x = 0; x < width; x++) {
                 for (const IteratorType &iteratorType: iteratorTypes) {
-                    const Power4Player playerAtIteratorStart = get(x, y);
-                    if (playerAtIteratorStart == '0') continue;
+                    int startX = static_cast<int>(x), startY = static_cast<int>(y);
+                    // we offset the iterators by -2 to be able to retrieve elements before the actual point
+                    switch (iteratorType) {
+                        case HORIZONTAL:
+                            startX -= 2;
+                            break;
+                        case VERTICAL:
+                            startY -= 2;
+                            break;
+                        case DIAGONAL_DOWN:
+                            startX -= 2;
+                            startY -= 2;
+                            break;
+                        case DIAGONAL_UP:
+                            startX -= 2;
+                            startY += 2;
+                            break;
+                    }
+                    BoardIterator boardIterator{this, iteratorType, startX, startY};
+                    const bool hasSpace2Before = boardIterator.getOrEmpty() == '0';
+                    const bool hasSpaceBefore = (++boardIterator).getOrEmpty() == '0';
+
+                    const Power4Player current = (++boardIterator).getOrEmpty();
+                    if (current != '1' && current != '2') continue;
 
                     unsigned int *currentAligns2Ptr;
                     unsigned int *currentAligns3Ptr;
-                    if (playerAtIteratorStart == '1') {
+                    if (current == '1') {
                         currentAligns2Ptr = &p1Aligns2;
                         currentAligns3Ptr = &p1Aligns3;
                     } else {
@@ -225,13 +250,32 @@ public:
                         currentAligns3Ptr = &p2Aligns3;
                     }
 
-                    BoardIterator boardIterator{this, iteratorType, x, y};
-                    const bool hasSpaceBefore = boardIterator.previousOrEmpty() == '0';
-                    ++boardIterator; // this iterator is actually always one ahead of the current cell
-                    unsigned int i = 1;
-                    Power4Player current = playerAtIteratorStart;
-                    Power4Player next = boardIterator.getOrEmpty();
-                    if (!next) continue;
+                    const Power4Player second = (++boardIterator).getOrEmpty();
+                    if (second != current) continue;
+                    const Power4Player third = (++boardIterator).getOrEmpty();
+                    const Power4Player fourth = (++boardIterator).getOrEmpty();
+
+                    // we know that second == current
+                    if (third == current) { // we have 3 aligned
+                        if (fourth == current) { // we have 4 aligned
+                            return current == '1' ? WIN_SCORE : -WIN_SCORE;
+                        }
+                        if (fourth == '0') { // we have space ahead
+                            ++(*currentAligns3Ptr);
+                        }
+                        if (hasSpaceBefore) {
+                            ++(*currentAligns3Ptr);
+                        }
+                    } else { // we have 2 aligned
+                        if (third == '0' && fourth == '0') { // we have space ahead to add 2
+                            ++(*currentAligns2Ptr);
+                        }
+                        if (hasSpaceBefore && hasSpace2Before) {
+                            ++(*currentAligns2Ptr);
+                        }
+                    }
+
+/*
                     while (current == playerAtIteratorStart) {
                         switch (i) {
                             case 2:
@@ -264,6 +308,7 @@ public:
                         current = next;
                         next = boardIterator.getOrEmpty();
                     }
+*/
                 }
             }
         }
@@ -300,7 +345,7 @@ public:
     }
 
     [[nodiscard]] bool isDraw() const override {
-        for (int x = 0; x < width; x++) {
+        for (unsigned int x = 0; x < width; x++) {
             if (board[getIndex(x, 0)] == '0') {
                 return false;
             }
@@ -309,9 +354,9 @@ public:
     }
 
     [[nodiscard]] std::unique_ptr<Power4Player> getWinner() const override {
-        std::stack<int> coords = getWinnerCoords();
+        std::stack<unsigned int> coords = getWinnerCoords();
         if (coords.empty()) return {nullptr};
-        int coord0 = coords.top();
+        unsigned int coord0 = coords.top();
         return std::make_unique<Power4Player>(board[coord0]);
     }
 
@@ -321,14 +366,14 @@ public:
      * meaning that std::queue::top() will return the coords with the lowest x then lowest y.
      * Empty if no winner.
      */
-    [[nodiscard]] std::stack<int> getWinnerCoords() const {
+    [[nodiscard]] std::stack<unsigned int> getWinnerCoords() const {
         if (isWinnerCoordsComputed) {
             return computedWinnerCoords;
         }
-        std::stack<int> coords;
+        std::stack<unsigned int> coords;
         // Horizontal
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width - 3; x++) {
+        for (unsigned int y = 0; y < height; y++) {
+            for (unsigned int x = 0; x < width - 3; x++) {
                 Power4Player value = board[getIndex(x, y)];
                 if (value != '0' && value == board[getIndex(x + 1, y)] && value == board[getIndex(x + 2, y)] &&
                     value == board[getIndex(x + 3, y)]) {
@@ -342,8 +387,8 @@ public:
             }
         }
         // Vertical
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height - 3; y++) {
+        for (unsigned int x = 0; x < width; x++) {
+            for (unsigned int y = 0; y < height - 3; y++) {
                 Power4Player value = board[getIndex(x, y)];
                 if (value != '0' && value == board[getIndex(x, y + 1)] && value == board[getIndex(x, y + 2)] &&
                     value == board[getIndex(x, y + 3)]) {
@@ -357,8 +402,8 @@ public:
             }
         }
         // Diagonal
-        for (int x = 0; x < width - 3; x++) {
-            for (int y = 0; y < height - 3; y++) {
+        for (unsigned int x = 0; x < width - 3; x++) {
+            for (unsigned int y = 0; y < height - 3; y++) {
                 Power4Player value = board[getIndex(x, y)];
                 if (value != '0' && value == board[getIndex(x + 1, y + 1)] && value == board[getIndex(x + 2, y + 2)] &&
                     value == board[getIndex(x + 3, y + 3)]) {
@@ -371,8 +416,8 @@ public:
                 }
             }
         }
-        for (int x = 0; x < width - 3; x++) {
-            for (int y = 3; y < height; y++) {
+        for (unsigned int x = 0; x < width - 3; x++) {
+            for (unsigned int y = 3; y < height; y++) {
                 Power4Player value = board[getIndex(x, y)];
                 if (value != '0' && value == board[getIndex(x + 1, y - 1)] && value == board[getIndex(x + 2, y - 2)] &&
                     value == board[getIndex(x + 3, y - 3)]) {
@@ -398,9 +443,9 @@ public:
             std::cout << letter << " ";
         }
         std::cout << std::endl;
-        std::stack<int> winnerCoords = getWinnerCoords();
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
+        std::stack<unsigned int> winnerCoords = getWinnerCoords();
+        for (unsigned int y = 0; y < height; y++) {
+            for (unsigned int x = 0; x < width; x++) {
                 Power4Player value = board[getIndex(x, y)];
                 if (!winnerCoords.empty() && winnerCoords.top() == getIndex(x, y)) {
                     std::cout << dye::yellow(value);
