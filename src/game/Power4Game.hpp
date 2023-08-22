@@ -274,41 +274,6 @@ public:
                             ++(*currentAligns2Ptr);
                         }
                     }
-
-/*
-                    while (current == playerAtIteratorStart) {
-                        switch (i) {
-                            case 2:
-                                if (hasSpaceBefore) { // invalid if the player cannot continue
-                                    ++(*currentAligns2Ptr);
-                                }
-                                if (next == '0') { // if two sides are free, there are two possibilities to continue
-                                    ++(*currentAligns2Ptr);
-                                }
-                                break;
-                            case 3:
-                                if (hasSpaceBefore) {
-                                    ++(*currentAligns3Ptr);
-                                    --(*currentAligns2Ptr); // 3 aligned is also 2 aligned
-                                }
-                                if (next == '0') {
-                                    ++(*currentAligns3Ptr);
-                                    --(*currentAligns2Ptr); // we are removing 2 2aligned because 2 were added in the previous iteration
-                                }
-                                break;
-                            case 4:
-                                return player == playerAtIteratorStart ? WIN_SCORE : -WIN_SCORE;
-                            default:
-                                break;
-                        }
-
-                        if (!boardIterator.isInBoard()) break; // if future current is not in board
-                        ++i;
-                        ++boardIterator;
-                        current = next;
-                        next = boardIterator.getOrEmpty();
-                    }
-*/
                 }
             }
         }
